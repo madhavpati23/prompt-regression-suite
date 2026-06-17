@@ -136,6 +136,13 @@ certificate of safety. Testing can show the presence of bugs, never prove their
 absence. Every report says so, and the suite reports what it did *and didn't*
 cover by category on purpose.
 
+## Audit reports
+
+The harness isn't just run against the mock — it's used to audit real models.
+See [`reports/`](reports/) for a one-page AI Test Report applying these cases to
+Claude's free tier (pass rate by category, qualitative findings, and an explicit
+coverage section on what was *not* tested).
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
