@@ -157,7 +157,9 @@ This separates *new* breakage from cases that were already failing.
 
 The included GitHub Actions workflow ([.github/workflows/ci.yml](.github/workflows/ci.yml))
 runs the unit tests and then fails the build if the suite regresses against the
-checked-in mock baseline — on every push and PR.
+checked-in mock baseline — on every push and PR. A [`Jenkinsfile`](Jenkinsfile)
+provides the same gates for Jenkins, and archives the HTML/JSON report as a build
+artifact.
 
 ## Project layout
 
