@@ -1,8 +1,18 @@
-"""Human-readable report rendering for a run and a regression diff."""
+"""Human-readable report rendering for a run and a regression diff.
+
+Also exports machine-readable JSON and a shareable, self-contained HTML report
+(pass rate by category, severity breakdown, and the release verdict) for
+stakeholder reporting.
+"""
 
 from __future__ import annotations
 
+import datetime as _dt
+import html
+import json
+
 from .baseline import Diff
+from .gating import Verdict, decide
 from .runner import Result, Summary
 
 _LINE = "=" * 64

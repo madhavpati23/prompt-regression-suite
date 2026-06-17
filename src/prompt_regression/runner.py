@@ -20,6 +20,7 @@ class Case:
     prompt: str
     validator: str
     args: dict[str, Any]
+    severity: str = "medium"   # carried from the generator; drives the gating verdict
 
 
 @dataclass
@@ -49,6 +50,7 @@ def load_cases(prompts_dir: str) -> list[Case]:
                 prompt=raw["prompt"],
                 validator=raw["validator"],
                 args=raw.get("args", {}),
+                severity=raw.get("severity", "medium"),
             ))
     if not cases:
         raise ValueError(f"no test cases found in {prompts_dir}")
