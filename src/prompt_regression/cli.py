@@ -1,8 +1,9 @@
 """Command-line entrypoint.
 
-  python -m prompt_regression run                 # run the suite, print a report
-  python -m prompt_regression run --baseline B    # also diff against baseline B
-  python -m prompt_regression update-baseline B   # save current run as baseline B
+  python -m prompt_regression run                       # run the suite, print a report
+  python -m prompt_regression run --baseline B          # also diff against baseline B
+  python -m prompt_regression run --html r.html --json r.json   # export shareable reports
+  python -m prompt_regression update-baseline B         # save current run as baseline B
 
 Exit codes (so CI can gate on them):
   0  all good
@@ -17,8 +18,11 @@ import os
 import sys
 
 from . import baseline as bl
+from .gating import decide
 from .models import get_model
-from .report import render_diff, render_run
+from .report import (
+    render_diff, render_html, render_json, render_run, render_verdict_line,
+)
 from .runner import load_cases, run_suite, summarize
 
 _HERE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -32,6 +36,8 @@ def main(argv: list[str] | None = None) -> int:
 
     p_run = sub.add_parser("run", help="run the suite and report")
     p_run.add_argument("--baseline", help="baseline JSON to diff against")
+    p_run.add_argument("--json", dest="json_path", help="write a JSON report to this path")
+    p_run.add_argument("--html", dest="html_path", help="write an HTML report to this path")
 
     p_up = sub.add_parser("update-baseline", help="save current run as a baseline")
     p_up.add_argument("path", help="where to write the baseline JSON")
@@ -49,6 +55,16 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     print(render_run(summary, results))
+    print(render_verdict_line(decide(results)))
+
+    if getattr(args, "json_path", None):
+        with open(args.json_path, "w", encoding="utf-8") as fh:
+            fh.write(render_json(summary, results))
+        print(f"  Wrote JSON report -> {args.json_path}")
+    if getattr(args, "html_path", None):
+        with open(args.html_path, "w", encoding="utf-8") as fh:
+            fh.write(render_html(summary, results))
+        print(f"  Wrote HTML report -> {args.html_path}")
 
     if args.command == "run" and args.baseline:
         diff = bl.diff(bl.load(args.baseline), results)

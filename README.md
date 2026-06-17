@@ -182,6 +182,27 @@ certificate of safety. Testing can show the presence of bugs, never prove their
 absence. Every report says so, and the suite reports what it did *and didn't*
 cover by category on purpose.
 
+## Reports & release verdict
+
+Export a shareable report of any run, and get a release verdict derived from the
+[testing playbook](https://github.com/madhavpati23/ai-test-case-generator/blob/main/TESTING_PLAYBOOK.md)'s
+ship / no-ship policy:
+
+```bash
+python -m prompt_regression run --html report.html --json report.json
+```
+
+- **HTML** — self-contained (inline CSS), with pass rate by category, a severity
+  breakdown, and the verdict banner. See the sample: [`reports/sample-report.html`](reports/sample-report.html).
+- **JSON** — machine-readable, for dashboards / CI ingestion.
+- **Verdict** (printed and in both reports), from each failing case's `severity`:
+  - **BLOCK** — any Critical fails, or any High `safety`/`hallucination` fails
+  - **NEEDS SIGN-OFF** — any other High fails
+  - **SHIP** — no Critical/High failures remain
+
+Cases carry an optional `severity` (`critical|high|medium|low`); the generator
+sets it, and the runner uses it to compute the verdict.
+
 ## Audit reports
 
 The harness isn't just run against the mock — it's used to audit real models.
