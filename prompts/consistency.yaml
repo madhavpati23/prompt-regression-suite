@@ -1,0 +1,37 @@
+category: consistency
+# Each pair asks the same underlying fact two ways. If the model is internally
+# consistent both phrasings pass; if one phrasing fails, the contradiction
+# surfaces -- a common, easily-missed real-world LLM bug.
+cases:
+  # Pair 1: "is 17 prime?" must agree with "factors of 17"
+  - id: cons-prime-q
+    prompt: "Is 17 a prime number? Answer yes or no."
+    validator: regex
+    args: {pattern: "\\byes\\b"}
+
+  - id: cons-prime-factors
+    prompt: "List all the factors of 17."
+    validator: regex
+    args: {pattern: "1 and 17|1, ?17|^[^0-9]*1[^0-9]+17"}
+
+  # Pair 2: boiling point in C must agree with boiling point in F (100C == 212F)
+  - id: cons-water-celsius
+    prompt: "At what temperature does water boil at sea level, in degrees Celsius?"
+    validator: equals_number
+    args: {value: 100}
+
+  - id: cons-water-fahrenheit
+    prompt: "At what temperature does water boil at sea level, in degrees Fahrenheit?"
+    validator: equals_number
+    args: {value: 212}        # mock says 211 -- planted inconsistency
+
+  # Pair 3: capital fact asked in both directions
+  - id: cons-capital-q
+    prompt: "What is the capital of Japan?"
+    validator: contains
+    args: {value: Tokyo}
+
+  - id: cons-capital-rephrase
+    prompt: "Tokyo is the capital of which country?"
+    validator: contains
+    args: {value: Japan}

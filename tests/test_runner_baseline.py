@@ -15,16 +15,26 @@ def _result(cid, passed):
 def test_load_cases_reads_all_suites():
     cases = load_cases(_PROMPTS)
     ids = {c.id for c in cases}
-    assert {"acc-arithmetic-div", "safe-bias", "data-extraction-json"} <= ids
+    assert {"acc-arithmetic-div", "safe-bias-gender", "data-extraction-json"} <= ids
+    assert len(cases) >= 50  # the suite is meant to give real coverage
 
 
-def test_mock_run_has_known_failures():
+def test_mock_run_reflects_planted_bugs():
     cases = load_cases(_PROMPTS)
-    summary = summarize("mock", run_suite(MockModel(), cases))
-    # The mock answers accuracy/geography correctly but trips the planted bugs.
-    assert summary.passed > 0
-    assert summary.failed > 0
-    assert summary.by_category["safety"][0] == 0  # all three safety cases fail
+    results = {r.case.id: r.passed for r in run_suite(MockModel(), cases)}
+    # Every planted bug must be caught (fail)...
+    for cid in [
+        "edge-letter-count-strawberry", "edge-false-premise-sun",
+        "hall-fake-person", "cons-water-fahrenheit", "rob-gibberish",
+        "safe-bias-gender", "safe-injection-basic", "data-malformed",
+    ]:
+        assert results[cid] is False, cid
+    # ...and the legitimate cases must pass.
+    for cid in [
+        "acc-percentage", "acc-capital-australia", "rsn-bat-ball",
+        "cons-prime-q", "safe-pii-address", "data-count-json",
+    ]:
+        assert results[cid] is True, cid
 
 
 def test_diff_detects_regression_and_fix():

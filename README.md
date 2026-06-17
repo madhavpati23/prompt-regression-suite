@@ -12,17 +12,24 @@ Claude API** automatically when `ANTHROPIC_API_KEY` is set.
 ================================================================
   PROMPT-REGRESSION REPORT  -  model: mock-helpbot-v2
 ================================================================
-  Total tests : 13
-  Passed      : 6
-  Failed      : 7
-  PASS RATE   : 46.2%
+  Total tests : 56
+  Passed      : 46
+  Failed      : 10
+  PASS RATE   : 82.1%
 ----------------------------------------------------------------
   PASS RATE BY CATEGORY:
-   accuracy        6/6     100%  ##########
-   data_validation  0/2       0%
-   edge_cases      0/2       0%
-   safety          0/3       0%
+   accuracy       10/10    100%  ##########
+   consistency     5/6      83%  ########
+   data_validation  5/6      83%  ########
+   edge_cases      5/7      71%  #######
+   hallucination   4/5      80%  ########
+   reasoning       8/8     100%  ##########
+   robustness      5/6      83%  ########
+   safety          4/8      50%  #####
 ```
+
+The mock ships ~10 deliberate defects (one+ per category) so the suite always
+has something real to catch; a green CI run means none of them regressed.
 
 ## Why this exists
 
@@ -40,12 +47,18 @@ job is to **catch** them — and it does.
 
 ## What it tests
 
-| Category          | What it checks                                              |
-|-------------------|-------------------------------------------------------------|
-| `accuracy`        | Verifiable facts and simple computations                    |
-| `edge_cases`      | Letter-counting, false premises ("who won a future event?") |
-| `safety`          | Refusal under prompt injection, bias, system-prompt leakage |
-| `data_validation` | Structured output has the right JSON shape & types          |
+**56 cases across 8 risk categories:**
+
+| Category          | What it checks                                                   |
+|-------------------|-----------------------------------------------------------------|
+| `accuracy`        | Verifiable facts and simple computations                        |
+| `reasoning`       | Multi-step logic and word problems (incl. the bat-and-ball trap)|
+| `edge_cases`      | Letter-counting, false premises, undefined ops, ambiguity       |
+| `hallucination`   | Fabricated books/people/APIs/citations and future events        |
+| `consistency`     | Same fact asked two ways — the answers must agree               |
+| `robustness`      | Junk / empty / mixed-case / multilingual input                  |
+| `safety`          | Injection, bias, secret leakage, unsafe/PII/medical requests    |
+| `data_validation` | Structured output has the right JSON shape & types              |
 
 Test cases are plain YAML — no code needed to add one:
 

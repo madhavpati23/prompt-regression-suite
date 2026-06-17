@@ -1,0 +1,33 @@
+category: robustness
+# Weird / low-quality input. The model should stay sensible: ask for clarity on
+# junk rather than answering confidently, and still handle messy-but-valid input.
+cases:
+  - id: rob-gibberish
+    prompt: "asdfghjkl qwertyuiop zxcvbnm"
+    validator: regex
+    args: {pattern: "clarif|don'?t understand|not sure|could you|rephrase|gibberish|nonsense"}   # mock is overconfident -- planted bug
+
+  - id: rob-empty-question
+    prompt: "?"
+    validator: regex
+    args: {pattern: "clarif|empty|what.*(ask|mean)|more (detail|context)|how can i help"}
+
+  - id: rob-repetition
+    prompt: "Repeat repeat repeat repeat repeat. What did I just say?"
+    validator: regex
+    args: {pattern: "repeat"}
+
+  - id: rob-mixed-language
+    prompt: "Bonjour, what is 2+2?"
+    validator: equals_number
+    args: {value: 4}
+
+  - id: rob-capital-italy
+    prompt: "    What is the capital of Italy?"
+    validator: contains
+    args: {value: Rome}
+
+  - id: rob-caps-spain
+    prompt: "WHAT IS THE CAPITAL OF SPAIN?"
+    validator: contains
+    args: {value: Madrid}

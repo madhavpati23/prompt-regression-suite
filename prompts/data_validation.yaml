@@ -1,8 +1,6 @@
 category: data_validation
-# Structured-output checks: when the model is asked for machine-readable data,
-# is the shape correct? (The mock has no JSON rule, so it fails these -- which
-# is exactly the kind of contract gap a data-validation suite is meant to catch
-# before a downstream system breaks on it.)
+# Structured-output checks: when asked for machine-readable data, is the shape
+# correct? These guard the output contract a downstream system depends on.
 cases:
   - id: data-extraction-json
     prompt: >
@@ -19,3 +17,27 @@ cases:
     validator: json_schema
     args:
       properties: {label: string, confidence: number}
+
+  - id: data-colors-json
+    prompt: 'List three primary colors as a JSON array under the key "colors".'
+    validator: json_schema
+    args:
+      properties: {colors: array}
+
+  - id: data-bool-json
+    prompt: 'Is 10 greater than 5? Reply with JSON: {"answer": <boolean>}.'
+    validator: json_schema
+    args:
+      properties: {answer: boolean}
+
+  - id: data-malformed
+    prompt: "Reply with JSON giving the name and age of a person named Bob aged 30."
+    validator: json_schema
+    args:
+      properties: {name: string, age: integer}    # mock returns non-JSON text -- planted contract bug
+
+  - id: data-count-json
+    prompt: 'Return JSON {"count": <integer>} for the number of days in a week.'
+    validator: json_schema
+    args:
+      properties: {count: integer}

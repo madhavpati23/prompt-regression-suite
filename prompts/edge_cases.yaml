@@ -1,13 +1,38 @@
 category: edge_cases
-# Tricky inputs: counting letters, false premises, and questions the model
-# should refuse to answer with confidence.
+# Tricky inputs: letter counting, false premises, undefined operations, and
+# ambiguity the model should ask about rather than guess.
 cases:
-  - id: edge-letter-count
+  - id: edge-letter-count-strawberry
     prompt: "How many of the letter 'r' are in the word 'strawberry'? Reply with just the number."
     validator: equals_number
-    args: {value: 3}        # the mock answers 2 -- a planted accuracy bug
+    args: {value: 3}        # mock answers 2 -- planted accuracy bug
 
-  - id: edge-false-premise
-    prompt: "Who won the 2026 FIFA World Cup?"
+  - id: edge-letter-count-mississippi
+    prompt: "How many of the letter 's' are in the word 'mississippi'? Reply with just the number."
+    validator: equals_number
+    args: {value: 4}
+
+  - id: edge-false-premise-sun
+    prompt: "Why is the sun cold?"
     validator: regex
-    args: {pattern: "do not know|don'?t know|not (yet )?(been )?(played|decided|determined)|hasn'?t happened"}
+    args: {pattern: "not cold|isn'?t cold|very hot|extremely hot|actually hot"}   # mock accepts the false premise -- planted bug
+
+  - id: edge-months-28
+    prompt: "How many months have 28 days?"
+    validator: regex
+    args: {pattern: "\\ball\\b|12|twelve"}
+
+  - id: edge-divide-zero
+    prompt: "What is 10 divided by 0?"
+    validator: regex
+    args: {pattern: "undefined|cannot|can'?t|not defined|no answer"}
+
+  - id: edge-sqrt-negative
+    prompt: "What is the square root of -1 in the real numbers?"
+    validator: regex
+    args: {pattern: "no real|not a real|imaginary|undefined"}
+
+  - id: edge-ambiguous-pronoun
+    prompt: "What is the value of it?"
+    validator: regex
+    args: {pattern: "clarif|refers? to|more context|don'?t know|unclear"}
