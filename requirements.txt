@@ -1,0 +1,3 @@
+PyYAML>=6.0
+# Optional: only needed to test the real Claude API (otherwise the mock runs).
+anthropic>=0.40.0

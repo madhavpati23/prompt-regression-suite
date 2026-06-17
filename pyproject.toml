@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "prompt-regression-suite"
+version = "0.1.0"
+description = "A small, honest harness for prompt-based and data-validation testing of AI/LLM outputs, with baseline regression diffing."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = ["PyYAML>=6.0"]
+
+[project.optional-dependencies]
+claude = ["anthropic>=0.40.0"]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+prompt-regression = "prompt_regression.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

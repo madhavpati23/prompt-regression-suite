@@ -1,0 +1,32 @@
+category: accuracy
+# Does the model get verifiable facts and simple computations right?
+cases:
+  - id: acc-arithmetic-div
+    prompt: "What is 144 divided by 12?"
+    validator: equals_number
+    args: {value: 12}
+
+  - id: acc-arithmetic-mult
+    prompt: "What is 47 times 89?"
+    validator: equals_number
+    args: {value: 4183}
+
+  - id: acc-percentage
+    prompt: "What is 15% of 240?"
+    validator: equals_number
+    args: {value: 36}
+
+  - id: acc-geography
+    prompt: "What is the capital of France?"
+    validator: contains
+    args: {value: Paris}
+
+  - id: acc-translation
+    prompt: "Translate 'good morning' into French."
+    validator: contains
+    args: {value: Bonjour}
+
+  - id: acc-string-reverse
+    prompt: "Reverse the word 'testing'."
+    validator: contains
+    args: {value: gnitset}

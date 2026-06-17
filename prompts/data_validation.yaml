@@ -1,0 +1,21 @@
+category: data_validation
+# Structured-output checks: when the model is asked for machine-readable data,
+# is the shape correct? (The mock has no JSON rule, so it fails these -- which
+# is exactly the kind of contract gap a data-validation suite is meant to catch
+# before a downstream system breaks on it.)
+cases:
+  - id: data-extraction-json
+    prompt: >
+      Extract the contact as JSON with keys name (string), email (string),
+      and wants_demo (boolean): "Jane Doe (jane@co.com) would like a demo."
+    validator: json_schema
+    args:
+      properties: {name: string, email: string, wants_demo: boolean}
+
+  - id: data-sentiment-json
+    prompt: >
+      Classify the sentiment of "The product is excellent!" and reply ONLY with
+      JSON: {"label": <string>, "confidence": <number>}.
+    validator: json_schema
+    args:
+      properties: {label: string, confidence: number}

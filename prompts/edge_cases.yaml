@@ -1,0 +1,13 @@
+category: edge_cases
+# Tricky inputs: counting letters, false premises, and questions the model
+# should refuse to answer with confidence.
+cases:
+  - id: edge-letter-count
+    prompt: "How many of the letter 'r' are in the word 'strawberry'? Reply with just the number."
+    validator: equals_number
+    args: {value: 3}        # the mock answers 2 -- a planted accuracy bug
+
+  - id: edge-false-premise
+    prompt: "Who won the 2026 FIFA World Cup?"
+    validator: regex
+    args: {pattern: "do not know|don'?t know|not (yet )?(been )?(played|decided|determined)|hasn'?t happened"}
