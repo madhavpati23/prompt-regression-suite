@@ -102,6 +102,39 @@ The Claude adapter uses the official `anthropic` SDK with adaptive thinking
 (`thinking={"type": "adaptive"}`) — the supported thinking mode for the Opus 4.x
 family. Override the model with `PRS_MODEL=claude-sonnet-4-6`.
 
+### Test any real AI endpoint (HTTP adapter)
+
+Point the runner at a real product — an OpenAI-style chat API, an internal
+service, a self-hosted model server — with **no code changes**, just environment
+variables. The adapter POSTs a JSON body (the `{PROMPT}` token is replaced with
+the JSON-encoded prompt) and reads the answer from a dotted response path. It
+uses only the standard library.
+
+```bash
+# Generic internal endpoint that takes {"prompt": "..."} and returns {"output": "..."}:
+export PRS_HTTP_URL="https://my-service.internal/ask"
+python -m prompt_regression run
+
+# OpenAI-compatible chat endpoint:
+export PRS_HTTP_URL="https://api.openai.com/v1/chat/completions"
+export PRS_HTTP_HEADERS='{"Authorization": "Bearer sk-..."}'
+export PRS_HTTP_BODY='{"model": "gpt-4o-mini", "messages": [{"role": "user", "content": {PROMPT}}]}'
+export PRS_HTTP_RESPONSE_PATH="choices.0.message.content"
+python -m prompt_regression run --baseline baselines/my-product.baseline.json
+```
+
+| Env var | Purpose | Default |
+|---------|---------|---------|
+| `PRS_HTTP_URL` | endpoint (presence activates this adapter) | — |
+| `PRS_HTTP_BODY` | JSON template; `{PROMPT}` → JSON-encoded prompt | `{"prompt": {PROMPT}}` |
+| `PRS_HTTP_RESPONSE_PATH` | dotted path to the answer (`""` = raw body) | `output` |
+| `PRS_HTTP_HEADERS` | JSON object of extra headers (auth, etc.) | none |
+| `PRS_HTTP_METHOD` | HTTP method | `POST` |
+
+Adapter precedence: **HTTP** (if `PRS_HTTP_URL` set) → **Claude** (if
+`ANTHROPIC_API_KEY` set) → **mock**. The same test cases run against the mock in
+CI and a real product in staging — unchanged.
+
 ## How regression detection works
 
 A **baseline** records the per-case pass/fail of a known-good run. On a later run
@@ -132,7 +165,7 @@ checked-in mock baseline — on every push and PR.
 prompts/                     # test cases, one YAML file per risk category
 baselines/                   # saved known-good pass/fail snapshots
 src/prompt_regression/
-  models.py                  # adapters: deterministic mock + real Claude API
+  models.py                  # adapters: mock + Claude + generic HTTP/JSON endpoint
   validators.py              # the judging rules (contains, regex, json_schema, ...)
   runner.py                  # load cases -> ask model -> judge -> summarize
   baseline.py                # save / diff baselines  (regression core)

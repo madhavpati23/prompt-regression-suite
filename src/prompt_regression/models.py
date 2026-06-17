@@ -7,9 +7,11 @@ without changing a single test case.
 
 from __future__ import annotations
 
+import json
 import os
 import re
-from typing import Protocol
+import urllib.request
+from typing import Any, Protocol
 
 
 class Model(Protocol):
@@ -142,8 +144,89 @@ class ClaudeModel:
         return "".join(b.text for b in response.content if b.type == "text").strip()
 
 
+def _dig(data: Any, path: str) -> Any:
+    """Walk a dotted path through nested dicts/lists, e.g. choices.0.message.content."""
+    cur = data
+    for part in path.split("."):
+        if isinstance(cur, list):
+            cur = cur[int(part)]
+        elif isinstance(cur, dict):
+            cur = cur[part]
+        else:
+            raise KeyError(f"cannot descend into {part!r}")
+    return cur
+
+
+class HttpModel:
+    """Adapter for ANY HTTP/JSON AI endpoint — config-driven, no code changes.
+
+    Point it at a real product (an OpenAI-style chat API, an internal service,
+    a self-hosted model server). It POSTs a JSON body built from a template and
+    extracts the answer from the response via a dotted path. Uses only the
+    standard library, so the suite stays dependency-light.
+
+    Configured entirely from the environment (see get_model):
+      PRS_HTTP_URL           - endpoint (required to activate)
+      PRS_HTTP_BODY          - JSON template; the token {PROMPT} is replaced with
+                               the JSON-encoded prompt. Default: {"prompt": {PROMPT}}
+      PRS_HTTP_RESPONSE_PATH - dotted path to the answer text. "" = raw body.
+                               Default: output
+      PRS_HTTP_HEADERS       - JSON object of extra headers (e.g. Authorization)
+      PRS_HTTP_METHOD        - default POST
+    """
+
+    def __init__(self, url: str, body_template: str = '{"prompt": {PROMPT}}',
+                 response_path: str = "output", headers: dict[str, str] | None = None,
+                 method: str = "POST", timeout: float = 60.0):
+        self.name = f"http:{re.sub(r'^https?://', '', url).split('/')[0]}"
+        self.url = url
+        self.body_template = body_template
+        self.response_path = response_path
+        self.headers = headers or {}
+        self.method = method
+        self.timeout = timeout
+
+    @staticmethod
+    def render_body(template: str, prompt: str) -> bytes:
+        """Substitute {PROMPT} with the JSON-encoded prompt (safe escaping)."""
+        return template.replace("{PROMPT}", json.dumps(prompt)).encode("utf-8")
+
+    @staticmethod
+    def extract(raw_text: str, response_path: str) -> str:
+        """Pull the answer text out of the response body."""
+        if not response_path:
+            return raw_text.strip()
+        value = _dig(json.loads(raw_text), response_path)
+        return value if isinstance(value, str) else json.dumps(value)
+
+    def ask(self, prompt: str) -> str:
+        request = urllib.request.Request(
+            self.url,
+            data=self.render_body(self.body_template, prompt),
+            method=self.method,
+            headers={"Content-Type": "application/json", **self.headers},
+        )
+        with urllib.request.urlopen(request, timeout=self.timeout) as response:
+            raw = response.read().decode("utf-8")
+        return self.extract(raw, self.response_path)
+
+
 def get_model() -> Model:
-    """Pick the adapter: real Claude if a key is present, otherwise the mock."""
+    """Pick the adapter from the environment.
+
+    Precedence: an explicit HTTP endpoint, then the Claude API, then the offline
+    mock. This lets the same test suite run against the mock in CI and a real
+    product in a staging check, with no change to the cases.
+    """
+    if os.environ.get("PRS_HTTP_URL"):
+        headers = os.environ.get("PRS_HTTP_HEADERS")
+        return HttpModel(
+            url=os.environ["PRS_HTTP_URL"],
+            body_template=os.environ.get("PRS_HTTP_BODY", '{"prompt": {PROMPT}}'),
+            response_path=os.environ.get("PRS_HTTP_RESPONSE_PATH", "output"),
+            headers=json.loads(headers) if headers else None,
+            method=os.environ.get("PRS_HTTP_METHOD", "POST"),
+        )
     if os.environ.get("ANTHROPIC_API_KEY"):
         return ClaudeModel(os.environ.get("PRS_MODEL", "claude-opus-4-8"))
     return MockModel()
