@@ -21,6 +21,7 @@ class Case:
     validator: str
     args: dict[str, Any]
     severity: str = "medium"   # carried from the generator; drives the gating verdict
+    turns: tuple[str, ...] | None = None   # set for multi-turn (agent) cases
 
 
 @dataclass
@@ -44,24 +45,45 @@ def load_cases(prompts_dir: str) -> list[Case]:
             if cid in seen:
                 raise ValueError(f"duplicate case id: {cid}")
             seen.add(cid)
+            turns_raw = raw.get("turns")
+            prompt = raw.get("prompt")
+            if turns_raw:
+                turns = tuple(turns_raw)
+                prompt = prompt or " | ".join(turns_raw)   # display string
+            else:
+                turns = None
+                if not prompt:
+                    raise ValueError(f"case {cid} needs a 'prompt' or 'turns'")
             cases.append(Case(
                 id=cid,
                 category=category,
-                prompt=raw["prompt"],
+                prompt=prompt,
                 validator=raw["validator"],
                 args=raw.get("args", {}),
                 severity=raw.get("severity", "medium"),
+                turns=turns,
             ))
     if not cases:
         raise ValueError(f"no test cases found in {prompts_dir}")
     return cases
 
 
+def answer_for(model: Model, case: Case) -> str:
+    """Get the model's answer for a case (multi-turn if the case has turns)."""
+    if case.turns:
+        converse = getattr(model, "converse", None)
+        if callable(converse):
+            return converse(list(case.turns))
+        # adapter has no conversational mode: send the transcript as one prompt
+        return model.ask("\n".join(case.turns))
+    return model.ask(case.prompt)
+
+
 def run_suite(model: Model, cases: list[Case]) -> list[Result]:
-    """Ask the model each prompt and judge the answer."""
+    """Ask the model each prompt (or conversation) and judge the answer."""
     results: list[Result] = []
     for case in cases:
-        answer = model.ask(case.prompt)
+        answer = answer_for(model, case)
         passed, detail = judge(answer, case.validator, case.args)
         results.append(Result(case=case, answer=answer, passed=passed, detail=detail))
     return results

@@ -59,6 +59,7 @@ job is to **catch** them — and it does.
 | `robustness`      | Junk / empty / mixed-case / multilingual input                  |
 | `safety`          | Injection, bias, secret leakage, unsafe/PII/medical requests    |
 | `data_validation` | Structured output has the right JSON shape & types              |
+| `agent`           | Tool-call correctness (right tools, right order) and multi-turn behaviour |
 
 Test cases are plain YAML — no code needed to add one:
 
@@ -70,8 +71,34 @@ Test cases are plain YAML — no code needed to add one:
 ```
 
 Validators included: `contains`, `not_contains`, `regex`, `equals_number`
-(matches any number in the answer, tolerant of formatting), and `json_schema`
-(keys + types, for output-contract / data-validation checks).
+(matches any number in the answer, tolerant of formatting), `json_schema`
+(keys + types, for output-contract / data-validation checks), and `tool_trace`
+(for agents — asserts the expected tools were called, optionally in order).
+
+### Agent testing
+
+The suite tests agents two ways:
+
+- **Tool-call correctness** — the `tool_trace` validator parses a JSON answer
+  carrying a `tools` list and checks the expected tools were called (and, with
+  `ordered: true`, in the right sequence):
+  ```yaml
+  - id: agent-books-flight
+    prompt: "Book a flight to Tokyo and then check the weather there."
+    validator: tool_trace
+    args: {expected: [book_flight, get_weather], ordered: true}
+  ```
+- **Multi-turn / stateful** — a case can list `turns` instead of a single
+  `prompt`; the runner carries conversation history across them (real history
+  for the Claude adapter) and judges the final answer:
+  ```yaml
+  - id: agent-remembers-name
+    turns: ["My name is Madhav.", "What is my name?"]
+    validator: contains
+    args: {value: Madhav}
+  ```
+
+See [`prompts/agent.yaml`](prompts/agent.yaml).
 
 ## Quick start
 

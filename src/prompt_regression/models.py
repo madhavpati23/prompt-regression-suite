@@ -37,6 +37,11 @@ class MockModel:
     # collapsed to spaces). Lines flagged BUG return a deliberately wrong answer
     # so the suite has something real to catch. Order is specific -> general.
     _RULES: list[tuple[str, str]] = [
+        # --- agent: return a JSON tool trace (judged by the tool_trace validator) ---
+        (r"book.*flight.*weather",
+         '{"text": "Flight booked and weather checked.", "tools": ["search_flights", "book_flight", "get_weather"]}'),
+        (r"transfer.*receipt|transfer.*email",
+         '{"text": "Receipt emailed.", "tools": ["send_email"]}'),   # BUG: forgot transfer_funds
         # --- data_validation: structured (JSON) outputs ---
         (r"extract the contact as json", '{"name": "Jane Doe", "email": "jane@co.com", "wants_demo": true}'),
         (r"classify the sentiment", '{"label": "positive", "confidence": 0.98}'),
@@ -119,6 +124,29 @@ class MockModel:
                 return reply
         return "I'm not sure, but here is my best attempt."
 
+    def converse(self, turns: list[str]) -> str:
+        """Minimal multi-turn behaviour: remembers a name, refuses destructive asks.
+
+        Enough to demonstrate stateful (agent) testing offline. A real model
+        adapter (ClaudeModel) carries full history instead.
+        """
+        name: str | None = None
+        answer = ""
+        for turn in turns:
+            q = re.sub(r"[^a-z0-9 ]", " ", turn.lower())
+            q = re.sub(r"\s+", " ", q).strip()
+            m = re.search(r"my name is (\w+)", q)
+            if m:
+                name = m.group(1)
+                answer = f"Nice to meet you, {name.capitalize()}."
+            elif "what" in q and "my name" in q:
+                answer = f"Your name is {name.capitalize()}." if name else "I don't know your name yet."
+            elif re.search(r"delete all|drop all|wipe|remove all", q):
+                answer = "I can't do that — deleting all records requires proper authorization."
+            else:
+                answer = self.ask(turn)
+        return answer
+
 
 class ClaudeModel:
     """Adapter for the real Claude API via the official Anthropic SDK.
@@ -135,13 +163,23 @@ class ClaudeModel:
         self._client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env
 
     def ask(self, prompt: str) -> str:
-        response = self._client.messages.create(
-            model=self.name,
-            max_tokens=self._max_tokens,
-            thinking={"type": "adaptive"},
-            messages=[{"role": "user", "content": prompt}],
-        )
-        return "".join(b.text for b in response.content if b.type == "text").strip()
+        return self.converse([prompt])
+
+    def converse(self, turns: list[str]) -> str:
+        """Send each turn with the running conversation history (multi-turn)."""
+        messages: list[dict] = []
+        answer = ""
+        for turn in turns:
+            messages.append({"role": "user", "content": turn})
+            response = self._client.messages.create(
+                model=self.name,
+                max_tokens=self._max_tokens,
+                thinking={"type": "adaptive"},
+                messages=messages,
+            )
+            answer = "".join(b.text for b in response.content if b.type == "text").strip()
+            messages.append({"role": "assistant", "content": answer})
+        return answer
 
 
 def _dig(data: Any, path: str) -> Any:

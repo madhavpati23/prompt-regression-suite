@@ -85,12 +85,50 @@ def _json_schema(answer: str, args: dict[str, Any]) -> tuple[bool, str]:
     return True, ""
 
 
+def _tool_trace(answer: str, args: dict[str, Any]) -> tuple[bool, str]:
+    """Agent check: did the run call the expected tools (optionally in order)?
+
+    Expects the answer to be JSON containing a tool-call list at `path`
+    (default "tools"), each entry a tool name or an object with a "name" key:
+        {"text": "...", "tools": ["search", "book_flight", "get_weather"]}
+
+    args: {expected: [names], ordered: bool (default false), path: "tools"}
+    """
+    path = args.get("path", "tools")
+    try:
+        data = json.loads(answer)
+    except json.JSONDecodeError:
+        return False, "answer is not JSON, so it carries no tool trace"
+    cur: Any = data
+    for part in path.split("."):
+        if isinstance(cur, list):
+            cur = cur[int(part)] if part.isdigit() and int(part) < len(cur) else None
+        elif isinstance(cur, dict):
+            cur = cur.get(part)
+        else:
+            cur = None
+    if not isinstance(cur, list):
+        return False, f"no tool list found at path {path!r}"
+    names = [t.get("name") if isinstance(t, dict) else t for t in cur]
+
+    expected = args["expected"]
+    missing = [e for e in expected if e not in names]
+    if missing:
+        return False, f"missing tool call(s): {missing} (got {names})"
+    if args.get("ordered"):
+        it = iter(names)
+        if not all(any(e == got for got in it) for e in expected):
+            return False, f"tools called out of expected order (got {names})"
+    return True, ""
+
+
 REGISTRY: dict[str, Validator] = {
     "contains": _contains,
     "not_contains": _not_contains,
     "regex": _regex,
     "equals_number": _equals_number,
     "json_schema": _json_schema,
+    "tool_trace": _tool_trace,
 }
 
 
