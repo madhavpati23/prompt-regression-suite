@@ -254,6 +254,18 @@ the real bugs hide. The report (console + HTML + JSON) shows `passes/runs` per
 case and a flaky count. Defaults are `--repeat 1 --pass-threshold 1.0` (classic
 single-run behaviour).
 
+## Performance / SLA
+
+Latency is measured per case (mean across runs); reports show **avg / max
+latency** and the slowest case. Add `--sla-ms N` to flag cases over the SLA:
+
+```bash
+python -m prompt_regression run --sla-ms 5000   # list cases slower than 5s
+```
+
+SLA breaches are **reported, not gated** — speed and correctness stay separate
+signals, so a slow-but-correct answer doesn't flip the ship/no-ship verdict.
+
 ## Reports & release verdict
 
 Export a shareable report of any run, and get a release verdict derived from the
