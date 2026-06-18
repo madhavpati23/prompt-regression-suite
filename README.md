@@ -183,6 +183,13 @@ Adapter precedence: **HTTP** (if `PRS_HTTP_URL` set) → **Claude** (if
 `ANTHROPIC_API_KEY` set) → **mock**. The same test cases run against the mock in
 CI and a real product in staging — unchanged.
 
+**Security:** the HTTP adapter only accepts `http`/`https` URLs (never
+`file://`, `ftp://`, …). Set **`PRS_HTTP_BLOCK_PRIVATE=1`** to refuse endpoints
+that resolve to private/loopback/link-local/metadata addresses (SSRF protection)
+and to stop following redirects — recommended whenever the URL isn't fully
+trusted (e.g. a hosted UI). It's off by default so testing an internal endpoint
+on a private IP works locally. Responses are capped at 4 MB.
+
 ## How regression detection works
 
 A **baseline** records the per-case pass/fail of a known-good run. On a later run

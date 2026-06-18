@@ -7,10 +7,13 @@ without changing a single test case.
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
 import re
+import socket
 import urllib.request
+from urllib.parse import urlparse
 from typing import Any, Protocol
 
 
@@ -204,6 +207,46 @@ def _dig(data: Any, path: str) -> Any:
     return cur
 
 
+_MAX_RESPONSE_BYTES = 4_000_000   # cap response size (DoS guard)
+
+
+def _assert_safe_url(url: str, block_private: bool) -> None:
+    """Reject non-http(s) schemes always; reject non-public addresses when asked.
+
+    The scheme check (no file://, ftp://, gopher://, …) is always on — those
+    never make sense for an AI endpoint and would enable local file reads. The
+    private-address (SSRF) check is opt-in via `block_private`, because testing
+    an internal service on a private IP is a legitimate local use; public
+    deployments turn it on (PRS_HTTP_BLOCK_PRIVATE=1) to prevent the app being
+    used as a proxy to internal/metadata endpoints.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"unsupported URL scheme {parsed.scheme!r}; only http/https allowed")
+    host = parsed.hostname
+    if not host:
+        raise ValueError("URL has no host")
+    if not block_private:
+        return
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    try:
+        infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+    except OSError as exc:
+        raise ValueError(f"could not resolve host {host!r}: {exc}")
+    for *_, sockaddr in infos:
+        ip = ipaddress.ip_address(sockaddr[0])
+        if (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
+                or ip.is_multicast or ip.is_unspecified):
+            raise ValueError(f"blocked non-public address for host {host!r} ({ip})")
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Don't follow redirects in safe mode (a 3xx could point at an internal host)."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D102
+        return None
+
+
 class HttpModel:
     """Adapter for ANY HTTP/JSON AI endpoint — config-driven, no code changes.
 
@@ -224,7 +267,8 @@ class HttpModel:
 
     def __init__(self, url: str, body_template: str = '{"prompt": {PROMPT}}',
                  response_path: str = "output", headers: dict[str, str] | None = None,
-                 method: str = "POST", timeout: float = 60.0):
+                 method: str = "POST", timeout: float = 60.0, block_private: bool = False):
+        _assert_safe_url(url, block_private=False)  # fail fast on a bad scheme/host
         self.name = f"http:{re.sub(r'^https?://', '', url).split('/')[0]}"
         self.url = url
         self.body_template = body_template
@@ -232,6 +276,9 @@ class HttpModel:
         self.headers = headers or {}
         self.method = method
         self.timeout = timeout
+        self.block_private = block_private
+        self._opener = (urllib.request.build_opener(_NoRedirect())
+                        if block_private else urllib.request.build_opener())
 
     @staticmethod
     def render_body(template: str, prompt: str) -> bytes:
@@ -247,15 +294,20 @@ class HttpModel:
         return value if isinstance(value, str) else json.dumps(value)
 
     def ask(self, prompt: str) -> str:
+        _assert_safe_url(self.url, block_private=self.block_private)  # re-check (DNS may change)
         request = urllib.request.Request(
             self.url,
             data=self.render_body(self.body_template, prompt),
             method=self.method,
             headers={"Content-Type": "application/json", **self.headers},
         )
-        with urllib.request.urlopen(request, timeout=self.timeout) as response:
-            raw = response.read().decode("utf-8")
+        with self._opener.open(request, timeout=self.timeout) as response:
+            raw = response.read(_MAX_RESPONSE_BYTES).decode("utf-8", errors="replace")
         return self.extract(raw, self.response_path)
+
+
+def _truthy(value: str | None) -> bool:
+    return str(value).strip().lower() in ("1", "true", "yes", "on")
 
 
 def get_model() -> Model:
@@ -273,6 +325,7 @@ def get_model() -> Model:
             response_path=os.environ.get("PRS_HTTP_RESPONSE_PATH", "output"),
             headers=json.loads(headers) if headers else None,
             method=os.environ.get("PRS_HTTP_METHOD", "POST"),
+            block_private=_truthy(os.environ.get("PRS_HTTP_BLOCK_PRIVATE")),
         )
     if os.environ.get("ANTHROPIC_API_KEY"):
         return ClaudeModel(os.environ.get("PRS_MODEL", "claude-opus-4-8"))
