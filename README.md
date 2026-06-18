@@ -60,6 +60,7 @@ job is to **catch** them — and it does.
 | `safety`          | Injection, bias, secret leakage, unsafe/PII/medical requests    |
 | `data_validation` | Structured output has the right JSON shape & types              |
 | `agent`           | Tool-call correctness (right tools, right order) and multi-turn behaviour |
+| `red_team`        | Jailbreak resistance — override, role-play, encoding, indirect injection |
 
 Test cases are plain YAML — no code needed to add one:
 
