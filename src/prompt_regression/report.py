@@ -32,12 +32,23 @@ def render_run(summary: Summary, results: list[Result]) -> str:
         bar = "#" * int(rate // 10)
         out.append(f"   {cat:<14} {passed:>2}/{total:<3} {rate:5.0f}%  {bar}")
 
+    runs = results[0].runs if results else 1
+    if runs > 1:
+        out.append(_THIN)
+        out.append(f"  Each case run {runs}x.")
+        flaky = [r for r in results if r.flaky]
+        if flaky:
+            out.append(f"  FLAKY ({len(flaky)}) — passed only some runs:")
+            for r in flaky:
+                out.append(f"     ~ {r.case.id}  ({r.passes}/{r.runs} passed)")
+
     failures = [r for r in results if not r.passed]
     if failures:
         out.append(_THIN)
         out.append("  FAILURES:")
         for r in failures:
-            out.append(f"   [FAIL] {r.case.id} [{r.case.category}] {r.case.prompt}")
+            runinfo = f" (passed {r.passes}/{r.runs})" if r.runs > 1 else ""
+            out.append(f"   [FAIL] {r.case.id} [{r.case.category}]{runinfo} {r.case.prompt}")
             out.append(f"          got : {r.answer}")
             out.append(f"          why : {r.detail}")
     out.append(_LINE)
@@ -82,6 +93,9 @@ def _result_dict(r: Result) -> dict:
         "severity": r.case.severity,
         "validator": r.case.validator,
         "passed": r.passed,
+        "runs": r.runs,
+        "passes": r.passes,
+        "flaky": r.flaky,
         "prompt": r.case.prompt,
         "answer": r.answer,
         "detail": r.detail,
@@ -91,6 +105,8 @@ def _result_dict(r: Result) -> dict:
 def build_report(summary: Summary, results: list[Result]) -> dict:
     """The single structured report object the JSON/HTML renderers share."""
     verdict = decide(results)
+    runs = results[0].runs if results else 1
+    flaky = [r.case.id for r in results if r.flaky]
     return {
         "generated_at": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
         "model": summary.model,
@@ -98,6 +114,8 @@ def build_report(summary: Summary, results: list[Result]) -> dict:
         "passed": summary.passed,
         "failed": summary.failed,
         "pass_rate": round(summary.pass_rate, 1),
+        "runs_per_case": runs,
+        "flaky": flaky,
         "verdict": verdict.decision,
         "severity_failed": verdict.severity_failed,
         "by_category": {
@@ -127,6 +145,10 @@ def render_html(summary: Summary, results: list[Result]) -> str:
     )
     sev = rpt["severity_failed"]
     sev_txt = ", ".join(f"{k}: {v}" for k, v in sorted(sev.items())) or "none"
+    flaky_card = (
+        f"<div class='card'><b>{len(rpt['flaky'])}</b>flaky (of {rpt['runs_per_case']}x)</div>"
+        if rpt["runs_per_case"] > 1 else ""
+    )
 
     fail_rows = "".join(
         f"<tr class='sev-{e(r['severity'])}'><td>{e(r['id'])}</td><td>{e(r['category'])}</td>"
@@ -159,6 +181,7 @@ def render_html(summary: Summary, results: list[Result]) -> str:
  <div class="card"><b>{rpt['passed']}/{rpt['total']}</b>passed</div>
  <div class="card"><b>{rpt['failed']}</b>failed</div>
  <div class="card"><b>{e(sev_txt)}</b>failures by severity</div>
+ {flaky_card}
 </div>
 <h2>Pass rate by category</h2>
 <table><tr><th>Category</th><th>Passed</th><th>Rate</th></tr>{cat_rows}</table>

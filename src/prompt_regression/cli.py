@@ -2,6 +2,7 @@
 
   python -m prompt_regression run                       # run the suite, print a report
   python -m prompt_regression run --baseline B          # also diff against baseline B
+  python -m prompt_regression run --repeat 5 --pass-threshold 0.8   # N runs, gate on pass rate
   python -m prompt_regression run --html r.html --json r.json   # export shareable reports
   python -m prompt_regression update-baseline B         # save current run as baseline B
 
@@ -38,6 +39,10 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument("--baseline", help="baseline JSON to diff against")
     p_run.add_argument("--json", dest="json_path", help="write a JSON report to this path")
     p_run.add_argument("--html", dest="html_path", help="write an HTML report to this path")
+    p_run.add_argument("--repeat", type=int, default=1,
+                       help="run each case N times (handles non-determinism)")
+    p_run.add_argument("--pass-threshold", type=float, default=1.0,
+                       help="fraction of runs that must pass for a case to pass (0-1; default 1.0)")
 
     p_up = sub.add_parser("update-baseline", help="save current run as a baseline")
     p_up.add_argument("path", help="where to write the baseline JSON")
@@ -46,7 +51,9 @@ def main(argv: list[str] | None = None) -> int:
 
     model = get_model()
     cases = load_cases(args.prompts)
-    results = run_suite(model, cases)
+    repeat = max(1, getattr(args, "repeat", 1))
+    threshold = getattr(args, "pass_threshold", 1.0)
+    results = run_suite(model, cases, repeat=repeat, pass_threshold=threshold)
     summary = summarize(model.name, results)
 
     if args.command == "update-baseline":

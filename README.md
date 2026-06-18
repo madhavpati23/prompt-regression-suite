@@ -231,6 +231,21 @@ certificate of safety. Testing can show the presence of bugs, never prove their
 absence. Every report says so, and the suite reports what it did *and didn't*
 cover by category on purpose.
 
+## Handling non-determinism (repeated runs)
+
+LLMs don't give the same answer every time, so a single green run is weak
+evidence. Run each case N times and gate on a **pass-rate threshold**:
+
+```bash
+# each case runs 5x; a case passes only if >= 80% of its runs pass
+python -m prompt_regression run --repeat 5 --pass-threshold 0.8
+```
+
+Cases that pass *some* runs but not all are reported as **flaky** — often where
+the real bugs hide. The report (console + HTML + JSON) shows `passes/runs` per
+case and a flaky count. Defaults are `--repeat 1 --pass-threshold 1.0` (classic
+single-run behaviour).
+
 ## Reports & release verdict
 
 Export a shareable report of any run, and get a release verdict derived from the

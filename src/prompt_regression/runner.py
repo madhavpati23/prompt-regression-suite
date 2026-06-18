@@ -28,8 +28,11 @@ class Case:
 class Result:
     case: Case
     answer: str
-    passed: bool
+    passed: bool          # cleared the pass-rate threshold across `runs`
     detail: str
+    runs: int = 1
+    passes: int = 1
+    flaky: bool = False   # passed some runs but not all — unstable behaviour
 
 
 def load_cases(prompts_dir: str) -> list[Case]:
@@ -79,13 +82,28 @@ def answer_for(model: Model, case: Case) -> str:
     return model.ask(case.prompt)
 
 
-def run_suite(model: Model, cases: list[Case]) -> list[Result]:
-    """Ask the model each prompt (or conversation) and judge the answer."""
+def run_suite(model: Model, cases: list[Case], repeat: int = 1,
+              pass_threshold: float = 1.0) -> list[Result]:
+    """Run each case `repeat` times; it passes if the pass rate >= threshold.
+
+    LLMs are non-deterministic, so a single green run is weak evidence. Running
+    N times and gating on a threshold turns a lucky pass into a real signal and
+    surfaces flaky cases (those that pass only sometimes).
+    """
     results: list[Result] = []
     for case in cases:
-        answer = answer_for(model, case)
-        passed, detail = judge(answer, case.validator, case.args)
-        results.append(Result(case=case, answer=answer, passed=passed, detail=detail))
+        outcomes = []  # (passed, answer, detail) per run
+        for _ in range(repeat):
+            answer = answer_for(model, case)
+            ok, detail = judge(answer, case.validator, case.args)
+            outcomes.append((ok, answer, detail))
+        passes = sum(1 for ok, _, _ in outcomes if ok)
+        passed = (passes / repeat) >= pass_threshold
+        flaky = 0 < passes < repeat
+        # show a failing run if there is one (most informative), else the last
+        rep = next((o for o in outcomes if not o[0]), outcomes[-1])
+        results.append(Result(case=case, answer=rep[1], passed=passed, detail=rep[2],
+                              runs=repeat, passes=passes, flaky=flaky))
     return results
 
 
