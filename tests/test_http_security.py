@@ -1,6 +1,6 @@
 import pytest
 
-from prompt_regression.models import HttpModel, _assert_safe_url
+from prompt_regression.models import HttpAgentModel, HttpModel, _assert_safe_url
 
 
 def test_non_http_schemes_are_rejected():
@@ -12,6 +12,16 @@ def test_non_http_schemes_are_rejected():
 def test_constructor_rejects_file_scheme():
     with pytest.raises(ValueError):
         HttpModel(url="file:///etc/passwd")
+
+
+def test_http_agent_model_constructor_rejects_file_scheme():
+    with pytest.raises(ValueError):
+        HttpAgentModel(url="file:///etc/passwd")
+
+
+def test_http_agent_model_name_derived_from_host():
+    m = HttpAgentModel(url="https://my-agent.example.com/run")
+    assert m.name == "agent:my-agent.example.com"
 
 
 def test_ssrf_block_rejects_loopback_and_metadata():
