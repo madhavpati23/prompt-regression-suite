@@ -12,6 +12,21 @@ def _result(cid, passed):
     return Result(case=case, answer="a", passed=passed, detail="")
 
 
+def test_run_suite_fires_on_case_heartbeat_for_every_case():
+    cases = load_cases(_PROMPTS)
+    seen = []
+    run_suite(MockModel(), cases, on_case=lambda i, n, c: seen.append((i, n, c.id)))
+    assert len(seen) == len(cases)
+    assert seen[0] == (1, len(cases), cases[0].id)
+    assert seen[-1] == (len(cases), len(cases), cases[-1].id)
+
+
+def test_run_suite_without_on_case_is_unaffected():
+    cases = load_cases(_PROMPTS)
+    results = run_suite(MockModel(), cases)   # no on_case passed at all
+    assert len(results) == len(cases)
+
+
 def test_load_cases_reads_all_suites():
     cases = load_cases(_PROMPTS)
     ids = {c.id for c in cases}
